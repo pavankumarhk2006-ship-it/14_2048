@@ -5,7 +5,9 @@ class Game:
     def __init__(self):
         self.board = Board()
         self.best_score = 0
-        self.history = []
+
+        self.previous_grid = None
+        self.previous_score = None
 
     def display(self):
         print("\n+------+------+------+------+")
@@ -21,12 +23,7 @@ class Game:
             )
             print("+------+------+------+------+")
 
-        print(
-            "Score:",
-            self.board.score,
-            "Best:",
-            self.best_score
-        )
+        print("Score:", self.board.score, "Best:", self.best_score)
 
     def move(self, key):
         moves = {
@@ -39,29 +36,52 @@ class Game:
         if key not in moves:
             return False
 
+        # Save state before the move
+        old_grid = [row[:] for row in self.board.grid]
+        old_score = self.board.score
+
         changed = moves[key]()
 
-        # Only create a new tile if the board actually changed.
         if changed:
+            # Save previous state for one-level undo
+            self.previous_grid = old_grid
+            self.previous_score = old_score
+
+            # Add a new tile only after a successful move
             self.board.add_random_tile()
+
+            # Update best score
+            self.best_score = max(
+                self.best_score,
+                self.board.score
+            )
 
         return changed
 
+    def undo(self):
+        if self.previous_grid is None:
+            print("Nothing to undo.")
+            return
+
+        self.board.grid = [row[:] for row in self.previous_grid]
+        self.board.score = self.previous_score
+
+        # Undo can only be used once
+        self.previous_grid = None
+        self.previous_score = None
+
+        print("Undo successful.")
+
     def run(self):
-        print(
-            "2048 — W/A/S/D to move, "
-            "U to undo, Q to quit."
-        )
+        print("2048 - W/A/S/D to move, U to undo, Q to quit.")
 
         while True:
             self.display()
 
-            # Win detection
             if any(2048 in row for row in self.board.grid):
                 print("You reached 2048!")
                 return
 
-            # No legal moves detection
             if not self.board.can_move():
                 print("No legal moves remain.")
                 return
@@ -72,16 +92,12 @@ class Game:
                 return
 
             if key == "u":
-                print("Undo is not implemented yet.")
+                self.undo()
                 continue
 
             if key not in "wasd":
                 print("Use W/A/S/D.")
                 continue
 
-            # Unchanged moves do not create a new tile.
-            if self.move(key):
-                self.best_score = max(
-                    self.best_score,
-                    self.board.score
-                )
+            if not self.move(key):
+                print("No tiles moved.")
